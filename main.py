@@ -44,9 +44,22 @@ def get_html(baseurl):
     html = HTMLParser(resp.text)
     return html
 
+def convert_fractional_unicode_to_float(data_obj):
+  fractions_map = {
+    '½': 0.5,
+    '⅓': 1/3,
+    '¼': 0.25,
+    '¾': 0.75,
+    # Add more Unicode fraction characters and their float equivalents as needed
+}
+  for char, float_value in fractions_map.items():
+    data_obj = data_obj.replace(char, str(float_value))
+  return data_obj
+
 def parse_page(html):
     ingredients = html.css("li.wprm-recipe-ingredient, li.leading-snug")
     Recipe = []
+    Ammounts = []
     for ingredient in ingredients:
         item = ingredient_details( 
             ammount=extract_text(ingredient,".wprm-recipe-ingredient-amount, .quantity"), 
@@ -56,6 +69,36 @@ def parse_page(html):
             )
         ingredient_data = Recipe.append(asdict(item))
 
+
+        if item.ammount is not None:
+          if '-' in item.ammount:
+            parts = item.ammount.split('-')  # Splitting the string at the hyphen
+            converted_value = (int(parts[0]) + int(parts[1])) / 2  # Calculate average of the two parts
+            Ammounts.append(converted_value)        
+            break
+          elif any(char in item.ammount for char in uni_chars):
+            amount_value = convert_fractional_unicode_to_float(item.ammount)
+            Ammounts.append(float(amount_value))
+            break
+          elif '.' in item.ammount:
+            float_value = float(item.ammount)
+            Ammounts.append(float_value)
+            break
+          elif item.ammount.isdigit():
+            int_value = int(item.ammount)
+            Ammounts.append(int_value)
+            break
+          elif ' ' in item.ammount:
+            parts = item.ammount.split(' ')
+            converted_value = int(parts[0])
+            Ammounts.append(converted_value)
+            break           
+          else:
+            Ammounts.append(item.ammount)
+            break
+        break
+
+
         #mycursor.execute("INSERT INTO Ingredient (item, ammount, unit) VALUES (%s, %s, %s)", (item.item, item.ammount, item.unit))
         #db.commit()
 
@@ -64,7 +107,7 @@ def parse_page(html):
         #for x in mycursor:
             #print(x)
           
-    return Recipe
+    return Recipe, Ammounts
 
 def main():
     grocery_list = []
@@ -103,8 +146,7 @@ def main():
     #]
 
     TEST_recipe_url = [
-    "https://twosleevers.com/caldo-de-res",
-    "https://thefoodieeats.com/pressure-cooker-pho-ga/"
+    "https://twosleevers.com/caldo-de-res"
     ]
 
 
